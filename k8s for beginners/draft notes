@@ -1,0 +1,529 @@
+Course Reference:
+
+
+    Oracle VirtualBox:  https://www.virtualbox.org/
+
+    Vagrant: https://www.vagrantup.com/
+
+    Link to download VM images: http://osboxes.org/
+
+    Link to kubeadm installation instructions: https://kubernetes.io/docs/setup/independent/install-kubeadm/
+
+
+    The link to Vagrant file:
+    https://github.com/kodekloudhub/certified-kubernetes-administrator-course
+
+    If you are new to VirtualBox or Vagrant, please follow this pre-requisites course to learn about it: https://www.youtube.com/watch?v=Wvf0mBNGjXY
+
+
+apiVersion and kubectl-explain note:
+
+    In case you're not sure which version to use for a particular resource, this (for ReplicaSets, for instance) will get you what you need:
+
+        anthony@MacBook-Pro-7 k8s for beginners % kubectl explain replicaset | grep -i version
+        VERSION:  apps/v1
+           apiVersion   <string>
+             APIVersion defines the versioned schema of this representation of an
+
+
+anthony@MacBook-Pro-7 envs % kubectl run nginx --image=nginx --dry-run=client -o json
+    {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+            "name": "nginx",
+            "creationTimestamp": null,
+            "labels": {
+                "run": "nginx"
+            }
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "nginx",
+                    "image": "nginx",
+                    "resources": {}
+                }
+            ],
+            "restartPolicy": "Always",
+            "dnsPolicy": "ClusterFirst"
+        },
+        "status": {}
+    }
+
+anthony@MacBook-Pro-7 envs % kubectl run redis --image=redis --dry-run=client -o json
+    {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+            "name": "redis",
+            "creationTimestamp": null,
+            "labels": {
+                "run": "redis"
+            }
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "redis",
+                    "image": "redis",
+                    "resources": {}
+                }
+            ],
+            "restartPolicy": "Always",
+            "dnsPolicy": "ClusterFirst"
+        },
+        "status": {}
+    }
+
+Can be combined (as ~/nginx-redis.yml) into:
+
+
+    {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+            "name": "nginx-redis",
+            "creationTimestamp": null,
+            "labels": {
+                "run": "nginx-redis"
+            }
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "nginx",
+                    "image": "nginx",
+                    "resources": {}
+                },
+                {
+                    "name": "redis",
+                    "image": "redis",
+                    "resources": {}
+                }
+            ],
+            "restartPolicy": "Always",
+            "dnsPolicy": "ClusterFirst"
+        },
+        "status": {}
+    }
+
+
+
+
+and run, together using
+
+
+    anthony@MacBook-Pro-7 envs % kubectl apply -f ~/nginx-redis.yml
+    pod/nginx created
+
+    ...
+
+    anthony@MacBook-Pro-7 envs % kubectl get pods -o wide
+    NAME          READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+    nginx-redis   2/2     Running   0          6s    172.17.0.3   minikube   <none>           <none>
+
+
+
+Hmm, one thing that I notice about "namespaces", they seem to encompass distinct/different IP address spaces:
+
+    anthony@MacBook-Pro-7 envs % kubectl get pods --all-namespaces -o wide
+    NAMESPACE     NAME                               READY   STATUS    RESTARTS   AGE    IP             NODE       NOMINATED NODE   READINESS GATES
+    default       nginx-redis                        2/2     Running   0          101s   172.17.0.3     minikube   <none>           <none>
+    kube-system   coredns-565d847f94-9mkpv           1/1     Running   0          141m   172.17.0.2     minikube   <none>           <none>
+    kube-system   etcd-minikube                      1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-apiserver-minikube            1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-controller-manager-minikube   1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-proxy-spknb                   1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-scheduler-minikube            1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   storage-provisioner                1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+
+
+except for that coredns item.  Hmm, 'not sure what to make of the fact that it's not in the 192.168 space.
+
+
+With the following being true:
+
+    anthony@MacBook-Pro-7 ~ % kubectx
+    dev
+    dev.caisgroup-aws.com-dev
+    docker-desktop
+    **minikube**
+    prod
+    qa
+
+I can bring up a pod, in the default namespace, that gets me a shell into the cluter:
+
+    anthony@MacBook-Pro-7 envs % kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+    If you don't see a command prompt, try pressing enter.
+    / #
+    / #
+    / #
+
+Run from another window in my workstation's iTerm app:
+
+    anthony@MacBook-Pro-7 ~ % kubectl get pods -o wide
+    NAME          READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+    nginx-redis   2/2     Running   0          29m   172.17.0.3   minikube   <none>           <none>
+    tmp-shell     1/1     Running   0          15s   172.17.0.4   minikube   <none>           <none>
+
+Back in that tmp-shell pod:
+
+    / # ping 172.17.0.3 -w 3
+    PING 172.17.0.3 (172.17.0.3): 56 data bytes
+    64 bytes from 172.17.0.3: seq=0 ttl=64 time=0.086 ms
+    64 bytes from 172.17.0.3: seq=1 ttl=64 time=0.139 ms
+    64 bytes from 172.17.0.3: seq=2 ttl=64 time=0.104 ms
+
+    --- 172.17.0.3 ping statistics ---
+    3 packets transmitted, 3 packets received, 0% packet loss
+    round-trip min/avg/max = 0.086/0.109/0.139 ms
+
+and I can see that redis and nginx are reachable:
+
+    / # nc -vz 172.17.0.3 6379
+    172.17.0.3 (172.17.0.3:6379) open
+    / # nc -vz 172.17.0.3 80
+    172.17.0.3 (172.17.0.3:80) open
+
+I'm also able to reach pods in the other namespace:
+
+    anthony@MacBook-Pro-7 envs % kubectl get pods --all-namespaces -o wide
+    NAMESPACE     NAME                               READY   STATUS    RESTARTS   AGE    IP             NODE       NOMINATED NODE   READINESS GATES
+    default       nginx-redis                        2/2     Running   0          101s   172.17.0.3     minikube   <none>           <none>
+    kube-system   coredns-565d847f94-9mkpv           1/1     Running   0          141m   172.17.0.2     minikube   <none>           <none>
+    kube-system   etcd-minikube                      1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-apiserver-minikube            1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-controller-manager-minikube   1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-proxy-spknb                   1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   kube-scheduler-minikube            1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+    kube-system   storage-provisioner                1/1     Running   0          141m   192.168.64.3   minikube   <none>           <none>
+
+    ...
+
+    / # ping 192.168.64.3 -w 3
+    PING 192.168.64.3 (192.168.64.3): 56 data bytes
+    64 bytes from 192.168.64.3: seq=0 ttl=64 time=0.748 ms
+    64 bytes from 192.168.64.3: seq=1 ttl=64 time=0.228 ms
+    64 bytes from 192.168.64.3: seq=2 ttl=64 time=0.189 ms
+
+    --- 192.168.64.3 ping statistics ---
+    3 packets transmitted, 3 packets received, 0% packet loss
+    round-trip min/avg/max = 0.189/0.388/0.748 ms
+
+
+
+
+
+
+
+Replication Controllers vs ReplicaSets
+
+Handle replication (for fault tolerance and/or load balancing) pods across one or more nodes.  ReplicaSets can manage pods, even if they're not defined in the sets' definition file.  ReqplicationControllers can only manage pods described in their definition files.
+
+
+
+anthony@MacBook-Pro-7 ~ % kubectl get replicationcontroller
+NAME       DESIRED   CURRENT   READY   AGE
+myapp-rc   3         3         3       71m
+
+
+To scale:
+
+    kubectl replace -f .../replicationset-definition.yml               # after increasing or decreasing the "replicas" value in the yml file.
+
+    kubectl scale --replicas=6 -f .../replicationset-definition.yml    # though, if replicas still != 6 in yml file...
+
+    kubectl scale --replicas=6 replicaset myapp-replicaset             # type ... name 
+
+
+
+
+** NOTE: in a ReplicaSet/ReplicaController   selector:matchLabels: section, you cannot change the labels and/or values, then apply, to a running config.  Doing so will cause you to see an error like the following:
+
+    The ReplicaSet "myapp-replicaset" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"env":"production"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
+
+
+The "selector" label is not required, with ReplicaControllers. Skip it, and the labels you provide in the "spec" section are assumed. With ReplicaSets, it is required, though, and must be specified, using the "matchLables" label or one of the others provided by the ReplicaSet resource type.
+
+
+
+
+Services
+
+How do I go about determining the IP of my minikube/hyperkit VM?  If you create a NodePort service (e.g., name=myapp-service) on the cluster, you can obtain the IP of the node, as part of it's URL, with:
+
+    minikube service myapp-service --url
+
+
+NodePort services provide you with a way of reaching -- from outside of a particular cluster -- services running on pods/containers, in that Kubernetes cluster: mapping K8s node IP+ports to pod/container ports.  A single NodePort service can span multiple nodes.
+
+ClusterIP services provide a single network interfact to multiple pods of a particular type.  So, for instance, if a particular front-end pod needs to communicate with a back-end one, the former would work thru a CluterIP service to get to the latter.
+
+
+LoadBalancer services... one of the main benefits of using these, over, perhaps, just setting a VM running nginx or haproxy out in front of your cluster, is that, like NodePort services, they can span multiple nodes, without your having to do any special network configuration work, to set them up.
+
+
+Deployments
+
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ...
+      labels:
+        name: ...
+        app: ...
+    spec:
+      replicas: ??
+      selector:
+        matchLabels:
+          < copy labels (excluding the "labels" header) from the related pod >
+
+      template:
+        < copy entire "metadata" block from related pod >
+        
+
+
+
+
+
+Kubernetes in the Cloud
+
+
+Service type is "loadbalancer" for cloud provider based K8s clusters.  For AWS, for instance, this makes it such that ALBs are provisioned for each of the services.
+
+
+KubeAdm 
+
+
+one of the things that it does for us is make the process of manually setting up a K8s cluster (master + worker nodes, certificates, linking of nodes, etc) less tedius.
+
+
+    https://kubernetes.io/docs/reference/setup-tools/kubeadm/
+
+
+
+
+Calico, Cilium, Weave, etc
+
+
+    These are K8s add-on/plugins that provide networking for supporting communications between cluster nodes. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Example commands:
+
+    NOTE: on all of the for ... kubectl create -f ... calls, this simple command, run from the folder containing the manifest files, would do the trick:
+
+        kubectl create -f .
+
+
+MacBook-Pro-7:example-voting-app-kubernetes anthony$ cat ~/kubectl.calls.txt | grep -v history
+  387  kubectl
+  710  kubectl
+  715  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+  716  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+  724  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+  796  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+  800  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+  886  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+  888  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 1734  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 1845  kubectl get pods
+ 1846  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 2511  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 2512  kubectl exec -it portal-67bc5fcf7d-p2sqn -n app -- /bin/bash
+ 2524  kubectl events --field-selector type=Warning01
+ 2526  kubectl get events --field-selector type=Warning01
+ 2528  kubectl get events --field-selector type=Warning01
+ 2529  00~kubectl explain events01~
+ 2530  kubectl explain events01
+ 2531  kubectl explain events
+ 2532  00~kubectl get events -n kube-system01~
+ 2537  kubectl get events -n kube-system
+ 2540  kubectl get events -n kube-system
+ 2541  kubectl get ns
+ 2542  kubectl get events -n app
+ 3281  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 3487  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 3768  kubectl run tmp-shell --rm -i --tty --image alpine -- /bin/ash
+ 3950  kubectl run mmerzi-agenerette-pgsql --rm -i --tty --image alpine -- /bin/ash
+ 3951  kubectl get nodes
+ 3952  kubectl cluster info
+ 3953  kubectl cluster-info
+ 4068  kubectl create -f Definition_files/deployments/deployment.yml
+ 4069  kubectl rollout status deployment/myapp-deployment
+ 4071  kubectl rollout --help
+ 4074  kubectl g p
+ 4075  kubectl g pods
+ 4076  kubectl get pods
+ 4077  kubectl get deployments
+ 4078  kubectl describe deployment myapp-deployment
+ 4093  kubectl create -f services-definition.yml
+ 4094  kubectl create -f services-definition.yml
+ 4095  kubectl get services
+ 4119  kubectl get pod -o wide
+ 4120  kubectl describe pod myapp-replicaset-579tc | grep -i label
+ 4121  kubectl describe pod myapp-replicaset-579tc | grep -i -A 3 label
+ 4141  kubectl get deployments
+ 4144  kubectl delete server my-app-service
+ 4145  kubectl delete service my-app-service
+ 4146  kubectl service delete my-app-service
+ 4147  kubectl delete --helpl
+ 4148  kubectl delete --help
+ 4149  kubectl delete services -l app=myapp
+ 4150  kubectl get services
+ 4151  kubectl describe service myapp-service
+ 4152  kubectl delete services myapp-service
+ 4155  kubectl create -f services-nodeport-definition.yml
+ 4160  kubectl create -f services-clusterip-definition.yml
+ 4161  kubectl get services
+ 4183  kubectl get pods
+ 4184  kubectl get pods -o wide
+ 4187  kubectl create -f voting-app-pod.yml
+ 4188  kubectl create -f voting-app-pod.yml
+ 4189  kubectl create -f voting-app-service.yaml
+ 4190  kubectl create -f voting-app-service.yaml
+ 4191  kubectl get pods
+ 4192  kubectl get services
+ 4193  kubectl create -f result-app-pod.yaml
+ 4194  kubectl create -f result-app-service.yaml
+ 4196  kubectl get pods.svc
+ 4197  kubectl get pods,svc
+ 4202  kubectl create -f postgres-pod.yaml
+ 4203  kubectl create -f postgres-pod.yaml
+ 4204  kubectl create -f postgres-service.yaml
+ 4205  kubectl get pods,svc
+ 4206  kubectl create -f worker-pod.yaml
+ 4207  kubectl get pods,svc
+ 4209  kubectl create -f redis-pod.yaml
+ 4210  kubectl create -f redis-pod.yaml
+ 4211  kubectl create -f redis-service.yaml
+ 4212  kubectl get pods,svc
+ 4213  kubectl get pods,svc
+ 4216  kubectl get pods,svc
+ 4217  kubectl describe pod/voting-app-pod
+ 4218  kubectl get pods,svc
+ 4219  kubectl describe service/voting-service
+ 4220  kubectl get pods,svc
+ 4221  kubectl describe pod/result-app-pod
+ 4223  kubectl get nodes
+ 4224  kubectl describe minikube
+ 4225  kubectl get pods -n kube-system -o wide
+ 4226  kubectl describe storage-provisioner
+ 4227  kubectl describe pod storage-provisioner
+ 4228  kubectl describe pod pod/storage-provisioner
+ 4229  kubectl describe pod storage-provisioner -n kube-system
+ 4230  kubectl describe service/voting-service
+ 4231  kubectl describe pod/voting-app-pod
+ 4232  kubectl get pods
+ 4233  kubectl describe postgres-pod
+ 4234  kubectl describe pod postgres-pod
+ 4235  kubectl get nodes
+ 4236* kubectl describe node miniku
+ 4237  kubectl get pods
+ 4238  kubectl describe pod redis-pod
+ 4239  kubectl logs redis-pod
+ 4240  kubectl get pods
+ 4241  kubectl delete pod voting-app-pod
+ 4243  kubectl create -f voting-app-pod.yml
+ 4244  kubectl get pods
+ 4245  kubectl delete pod myapp-rc-69pwr
+ 4246  kubectl delete pod myapp-rc-777wk
+ 4247  kubectl delete pod myapp-rc-d5n87
+ 4248  kubectl get replicasets
+ 4249  kubectl delete replicaset myapp-replicaset
+ 4250  kubectl get pods
+ 4251  kubectl get deployments
+ 4252  kubectl delete deployment myapp-deployment
+ 4253  kubectl get deployments
+ 4254  kubectl get pods
+ 4255  kubectl get replicasets
+ 4256  kubectl get applications
+ 4257  kubectl delete pod myapp-rc-dm9nw
+ 4258  kubectl get replica-controllers
+ 4259  kubectl get replicacontrollers
+ 4260  kubectl get rc
+ 4261  kubectl delete rc myapp-rc
+ 4263  kubectl get pods
+ 4266  kubectl get pods
+ 4267  kubectl delete pod nginx-redis
+ 4268  kubectl get pods
+ 4269  kubectl get pods | grep -v NAME
+ 4270  kubectl get pods | grep -v NAME | tr -s ' '
+ 4271  kubectl get pods | grep -v NAME | tr -s ' ' | cut -d ' ' -f1
+ 4272  for pod in $(kubectl get pods | grep -v NAME | tr -s ' ' | cut -d ' ' -f1); do kubectl delete pod $pod; done
+ 4273  kubectl get pods
+ 4274  kubectl get pods -o wide
+ 4275  kubectl get svc
+ 4276  for svc in $(kubectl get service | grep -v NAME | tr -s ' ' | cut -d ' ' -f1); do kubectl delete service $svc; done
+ 4277  kubectl get svc
+ 4281  kubectl create -f voting-app-deploy.yml
+ 4282  kubectl create -f voting-app-service.yaml
+ 4283  kubectl get deployments
+ 4284  kubectl get services
+ 4285  kubectl create -f redis-deploy.yml
+ 4286  kubectl create -f redis-service.yaml
+ 4287  kubectl get deployments
+ 4288  kubectl get services
+ 4289  kubectl create -f postgres-deploy.yml
+ 4290  kubectl create -f postgres-service.yaml
+ 4291  kubectl create -f worker-app-deploy.yml
+ 4293  kubectl get services
+ 4294  kubectl get deployments
+ 4295  kubectl create -f result-app-deploy.yml
+ 4296  kubectl create -f result-app-deploy.yml
+ 4297  kubectl create -f result-app-service.yaml
+ 4299  kubectl get pods,svc
+ 4300  kubectl get deployments,svc
+ 4304  kubectl scale deployment voting-app-deploy --replicas 3
+ 4305  kubectl scale deployment result-app-deploy --replicas 3
+ 4306  kubectl get deployments,svc
+ 4307  kubectl get deployments,svc
+ 4314  for pod in $(kubectl get pods | grep -v NAME | tr -s ' ' | cut -d ' ' -f1); do kubectl delete pod $pod; done
+ 4315  kubectl get deployments
+ 4316  for deploy in $(kubectl get deployments | grep -v NAME | tr -s ' ' | cut -d ' ' -f1); do kubectl delete deployment $deploy; done
+ 4318  kubectl get deployments
+ 4319  kubectl get services
+ 4320  kubectl get pods
+ 4321  kubectl get pods
+ 4322  kubectl get pods
+ 4323  kubectl get pods
+ 4324  kubectl get pods
+ 4333  for yml in $(ls | grep -v READ); do kubectl create -f $yml; done
+ 4334  kubectl get services
+ 4340  head ~/kubectl.calls.txt
+ 4341  cat ~/kubectl.calls.txt | sort | head
+ 4342  cat ~/kubectl.calls.txt | cut -d ' ' -f 2+ | sort | head
+ 4343  cat ~/kubectl.calls.txt | cut -d ' ' -f 2, | sort | head
+ 4344  cat ~/kubectl.calls.txt | cut -d ' ' -f 2 | sort | head
+ 4345  cat ~/kubectl.calls.txt | cut -d ' ' -f 2
+ 4346  cat ~/kubectl.calls.txt | cut -d ' ' -f 2+
+ 4347  cat ~/kubectl.calls.txt | cut -d ' ' -f1
+ 4348  cat ~/kubectl.calls.txt | cut -d ' ' -f12
+ 4349  cat ~/kubectl.calls.txt | cut -d ' ' -f2
+ 4350  cat ~/kubectl.calls.txt | cut -d ' ' -f2-12
+ 4351  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12
+ 4352  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort
+ 4353  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | head
+ 4354  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | uniq
+ 4355  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | uniq
+ 4359  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | uniq
+ 4364  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | uniq
+ 4365  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | uniq
+ 4366  cat ~/kubectl.calls.txt | cut -d ' ' -f3-12 | sort | uniq | grep for

@@ -1,0 +1,28 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "nginx-redis",
+        "creationTimestamp": null,
+        "labels": {
+            "run": "nginx-redis"
+        }
+    },
+    "spec": {
+        "containers": [
+            {
+                "name": "nginx",
+                "image": "nginx",
+                "resources": {}
+            },
+            {
+                "name": "redis",
+                "image": "redis",
+                "resources": {}
+            }
+        ],
+        "restartPolicy": "Always",
+        "dnsPolicy": "ClusterFirst"
+    },
+    "status": {}
+}

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: pod-that-uses-myuser-sa
+  name: pod-that-uses-myuser-sa
+spec:
+  serviceAccountName: myuser
+  containers:
+  - image: nginx
+    name: pod-that-uses-myuser-sa
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never 
+status: {}
+
+# Create an nginx pod that uses 'myuser' as a service account

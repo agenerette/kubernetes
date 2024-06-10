@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: busybox-pod-with-pvc
+  name: busybox-pod-with-pvc-2
+spec:
+  containers:
+  - image: busybox
+    name: busybox-pod-with-pvc
+    args: ["sleep", "3600"]
+    volumeMounts:
+    - name: data
+      mountPath: /etc/foo
+  restartPolicy: Never
+
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: mypvc
+
+
+# Create a second pod which is identical with the one you just created (you can easily do it by changing the 'name' property on pod.yaml). Connect to it and verify that '/etc/foo' contains the 'passwd' file. Delete pods to cleanup. Note: If you can't see the file from the second pod, can you figure out why? What would you do to fix that?
+

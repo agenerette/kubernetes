@@ -1,0 +1,39 @@
+(⎈|colima:app)C1-494-AGEN:temp anthony$ helm install release-1 ./wordpress
+NAME: release-1
+LAST DEPLOYED: Mon Apr  8 19:43:51 2024
+NAMESPACE: app
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CHART NAME: wordpress
+CHART VERSION: 22.1.5
+APP VERSION: 6.5.0
+
+** Please be patient while the chart is being deployed **
+
+Your WordPress site can be accessed through the following DNS name from within your cluster:
+
+    release-1-wordpress.app.svc.cluster.local (port 80)
+
+To access your WordPress site from outside the cluster follow the steps below:
+
+1. Get the WordPress URL by running these commands:
+
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        Watch the status with: 'kubectl get svc --namespace app -w release-1-wordpress'
+
+   export SERVICE_IP=$(kubectl get svc --namespace app release-1-wordpress --template "{{ range (index .status.loadBalancer.ingress 0) }}{{ . }}{{ end }}")
+   echo "WordPress URL: http://$SERVICE_IP/"
+   echo "WordPress Admin URL: http://$SERVICE_IP/admin"
+
+2. Open a browser and access WordPress using the obtained URL.
+
+3. Login with the following credentials below to see your blog:
+
+  echo Username: user
+  echo Password: $(kubectl get secret --namespace app release-1-wordpress -o jsonpath="{.data.wordpress-password}" | base64 -d)
+
+WARNING: There are "resources" sections in the chart not set. Using "resourcesPreset" is not recommended for production. For production installations, please set the following values according to your workload needs:
+  - resources
++info https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/

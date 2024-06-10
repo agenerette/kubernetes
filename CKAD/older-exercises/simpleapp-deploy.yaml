@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: foo
+  name: simpleapp-deploy
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simpleapp-deploy
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: simpleapp-deploy
+    spec:
+      containers:
+#     - image: dgkanatsios/simpleapp
+      - image: strm/helloworld-http
+        name: simpleapp
+        ports:
+        - containerPort: 80
+        resources: {}
+status: {}

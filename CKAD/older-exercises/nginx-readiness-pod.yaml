@@ -1,0 +1,24 @@
+# Create an nginx pod (that includes port 80) with an HTTP readinessProbe on path '/' on port 80. Again, run it, check the readinessProbe, delete it.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: nginx-rediness-pod
+  name: nginx-readiness-pod
+spec:
+  containers:
+  - image: nginx
+    name: nginx-readiness
+    ports:
+    - containerPort: 80
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 80
+      initialDelaySeconds: 15
+      periodSeconds: 10
+  restartPolicy: Never
+  dnsPolicy: ClusterFirst
+status: {}

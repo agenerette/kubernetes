@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-user101-pod
+spec:
+  securityContext:
+    runAsUser: 101
+  containers:
+  - name: nginx-user101
+    image: nginx
+    securityContext:
+      allowPrivilegeEscalation: false

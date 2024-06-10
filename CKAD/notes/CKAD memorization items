@@ -1,0 +1,64 @@
+
+
+
+Memorize these vim settings and put them in place, before each lab, at the start of the exam
+
+	echo "autocmd FileType yaml setlocal et ts=2 sw=2 ai nu sts=2" >> ~/.vimrc
+	echo "syntax on" >> ~/.vimrc
+
+
+		Reference:
+
+		et: expand tabs — when you press the tab key on the keyboard, Vim will add 2 spaces instead.
+
+		ts=2: tab stop — add 2 spaces for each tab expand.
+
+		sw=2: shift width — auto-indent 2 spaces.
+
+		ai: auto-indent — enable auto-indentation.
+
+		nu: numbers — show line numbers in the editor.
+
+		sts=2: soft tab stop — when backspacing a tab, remove 2 spaces instead.
+
+		syntax on: enable syntax highlighting.
+
+	** To indent a block, 
+		place curson on 1st line, 
+		press shift-V, to highlight,
+		arrow down to last line,
+		press shift-> (greater-than key)
+
+	** To outdent a block, follow the same steps as above, but with Less-than key at the end.
+
+
+It might also be necessary to get by without kubectx and kubens:
+
+	Contexts (don't forget "k config -h...")
+
+	k config get-contexts  					# view contexts available from current ($HOME/.kube/config) configuration.
+
+	k config use-context NAME  				# Set/reset context.  This may not get you to the namespace you want, though...
+											# to switch from the last NS used:
+
+	k config set-context --current --namespace=NS_NAME 
+
+	k get namespaces will give you all avail. namespaces, of course.  So, it might be best to always explicitly set/reset.
+
+
+
+
+# Sample question: Build user information for martin in the default kubeconfig file: User = martin , client-key = /root/martin.key and client-certificate = /root/martin.crt (Ensure don't embed within the kubeconfig file)
+
+  k config set-credentials martin
+  ## Then, edit ~/.kube/config, search for "martin".  Lines 25 and 26, below, will be present.  Add lines 27 and 28.
+
+     25 - name: martin
+     26   user:
+     27     client-certificate: /root/martin.crt
+     28     client-key: /root/martin.key
+
+
+# Sample question: Create a new context called 'developer' in the default kubeconfig file with 'user = martin' and 'cluster = kubernetes'
+
+  k config set-context developer --user=martin --cluster=kubernetes 

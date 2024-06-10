@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-netadmin-systime-pod
+spec:
+  containers:
+  - name: nginx-netadmin-systime
+    image: nginx
+    securityContext:
+      capabilities:
+        add: ["NET_ADMIN", "SYS_TIME"]

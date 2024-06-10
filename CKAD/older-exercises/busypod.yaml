@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: busypod
+  name: busypod
+  namespace: app
+spec:
+  containers:
+  - args:
+    - env
+    image: busybox
+    imagePullPolicy: Always
+    name: busypod

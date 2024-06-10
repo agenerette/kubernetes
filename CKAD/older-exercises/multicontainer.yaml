@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ls
+spec:
+  containers:
+  - name: ls1
+    image: busybox
+    command: ['sh', '-c', 'echo Hello; sleep 3600']
+  - name: ls2
+    image: busybox
+    command: ['sh', '-c', 'echo Hello; sleep 3600']

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: reqs-limits-pod
+  name: bad-limitsrange-reqs-limits-pod
+  namespace: one
+spec:
+  containers:
+  - image: nginx
+    resources:
+      requests:
+        memory: "560Mi"
+    name: limitsrange-reqs-limits
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+
+# Create an nginx pod that requests 250Mi of memory in the limitrange namespace

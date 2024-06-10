@@ -1,0 +1,943 @@
+Quick reference and other notes
+
+Keep a tab/window to https://spacelift.io/blog/kubernetes-cheat-sheet open
+
+
+Review these often:
+		
+	* Remember the Quick-reference!!  ## Search the docs for "quick reference"
+
+	* "Create a pod that will be placed on node controlplane..."
+
+	* "Return the deployment to the second revision (number 2)..."
+
+	* You should use kubectl imperative commands to create Kubernetes resources. Copy YAML from the documentation only when you can’t create it using kubectl.
+
+
+* Use commandline help options, if there's the slightest hesitancy, on rendering a particular call.
+
+
+
+Prep Exercises:
+
+	https://github.com/dgkanatsios/CKAD-exercises?tab=readme-ov-file
+
+	https://github.com/ibrahimatay/CKAD-Exercises
+
+
+Other notes:
+
+	https://dev.to/akdevcraft/certified-kubernetes-application-developer-ckad-exam-tips-4a1b
+
+	https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad
+
+
+Aliases (memorize these and put them in place, before each lab, at the start of the exam)
+
+	alias ka="kubectl apply -f"
+	alias kns="kubectl config set-context --current --namespace"
+	alias kd="kubectl describe"
+	alias ke="kubectl explain --recursive"
+	export do="--dry-run=client -o yaml"
+	export now="--grace-period 0 --force"
+
+
+
+Memorize these vim settings and put them in place, before each lab, at the start of the exam
+
+	echo "autocmd FileType yaml setlocal et ts=2 sw=2 ai nu sts=2" >> ~/.vimrc
+	echo "syntax on" >> ~/.vimrc
+
+
+Pods
+
+	"command" versus "args", on container runs... this from the CLI-help from "k run -h"
+
+			  # Start the nginx pod using the default command, but use custom arguments (arg1 .. argN) for that command
+			  kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
+
+			  # Start the nginx pod using a different command and custom arguments
+			  kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>
+
+		So, if you're wanting to run a shell command, upon creation of your pod,
+
+			"-- <arg1> <arg2> ... <argN>" passes those args as the same, to the default command run by the container
+
+		while,
+
+			"--command -- <cmd> <arg1> ... <argN>" runs a different command than the default: over-writing the default!!
+
+		Where you can detremine the default command for a particular container/image (nginx, in this example) by running:
+
+			docker inspect nginx | grep -i -A5 cmd
+				...
+	            "Cmd": [
+	                "nginx",
+	                "-g",
+	                "daemon off;"
+	            ],
+
+	    ***This means that using "--command <arg1> <arg2> ... <argN>" with the nginx container causes the nginx daemon to not be started!!***
+
+	    With image=busybox or image=alpine, we don't mind, if the default commands are over-written:
+
+			(⎈|colima:app)C1-494-AGEN:exercises anthony$ docker image inspect busybox | grep -i -A5 cmd
+						...
+			            "Cmd": [
+			                "sh"
+			            ],
+			            ...
+
+			(⎈|colima:app)C1-494-AGEN:exercises anthony$ docker image inspect alpine | grep -i -A5 cmd
+						...
+			            "Cmd": [
+			                "/bin/sh"
+			            ],
+
+		We can also pass "/bin/sh -c '...'" to sh, /bin/sh, bash, or /bin/bash, because we're just saying start a shell within a shell.
+
+
+
+	## DON'T FORGET "--restart=Never" (not "never") CLI option, on pod creation tasks. ## 
+
+	## "-it" if you want to easily see pod output or want to exec into pod ## 
+
+
+
+	** busybox image doesn't include "/bin/bash", so you'll need to use "/bin/sh", where shell calls are required. ** 
+
+	speaking of shell calls, watch for how you render quotation marks within quotation marks.  This will fail:
+
+		k run busypod --image=busybox --restart=Never -- /bin/sh -c "sleep 5; echo -e "hello world"; sleep 5"
+
+	but this will work:
+
+		k run busypod --image=busybox --restart=Never -- /bin/sh -c 'sleep 5; echo -e "hello world"; sleep 5'
+
+
+	Create a pod with image nginx called nginx and expose traffic on port 80
+
+		k run nginx --image=nginx --restart=Never --port=80
+
+
+	Change pod's image to nginx:1.7.1. Observe that the container will be restarted as soon as the image gets pulled
+
+		Note: The RESTARTS column should contain 0 initially (ideally - it could be any number)
+
+		# k set image POD/POD_NAME CONTAINER_NAME=IMAGE_NAME:TAG   ## can also target deployments, rc, etc. 
+		kubectl set image pod/nginx nginx=nginx:1.7.1
+		kubectl describe po nginx # you will see an event 'Container will be killed and recreated'
+		kubectl get po nginx -w # watch it
+
+
+	Create a namespace called 'mynamespace' and a pod with image nginx called nginx on this namespace
+
+		kubectl create namespace mynamespace
+		kubectl run nginx --image=nginx --restart=Never -n mynamespace
+
+	Create a busybox pod (using kubectl command) that runs the command "env". Run it and see the output
+
+		kubectl 3f2 # -it will help in seeing the output, --rm will immediately delete the pod after it exits
+		# or, just run it without -it
+		kubectl run busybox --image=busybox --command --restart=Never -- env
+		# and then, check its logs
+		kubectl logs busybox
+
+
+	Create the YAML for a new ResourceQuota called 'myrq' with hard limits of 1 CPU, 1G memory and 2 pods without creating it:
+
+		kubectl create quota myrq --hard=cpu=1,memory=1G,pods=2 --dry-run=client -o yaml
+
+	if pod crashed and restarted, get logs about the previous instance
+
+		kubectl logs nginx -p
+		# or
+		kubectl logs nginx --previous
+
+
+	Execute a simple shell on the nginx pod:
+
+		kubectl exec -it nginx -- /bin/sh
+
+
+	Execute other commands on the nginx pod:
+
+		k exec -it nginx -- /bin/sh -c echo "hello world"
+
+		k exec -it nginx -- echo "hello world"
+		hello world
+		k exec nginx --  /bin/sh -c env | grep -i home
+		HOME=/root
+
+	Create a busybox pod that echoes 'hello world' and then exits
+
+		kubectl run busybox --image=busybox -it --restart=Never -- echo 'hello world'
+
+
+
+	Pod Design
+
+		Labels  (the quick reference helps, a lot, with these)
+
+			-l             –> Filter using a specified label.
+
+				$ kgpo -l app  		# show all pods that have label-key "app"
+				$ kgpo -l app=v1   	# show all pods that have label-key "app", with it's value set to "v1"
+
+
+			-L label-key -> add column to output, with label[label-key], if valid for particular rows.
+
+				$ kgpo -L app 		# show all pods, with a column for label-key "app": value displayed, if set.
+
+
+				kubectl logs -l name=<label name>
+
+
+		Create 3 pods with names nginx1,nginx2,nginx3. All of them should have the label app=v1
+
+			kubectl run nginx1 --image=nginx --restart=Never --labels=app=v1
+			kubectl run nginx2 --image=nginx --restart=Never --labels=app=v1
+			kubectl run nginx3 --image=nginx --restart=Never --labels=app=v1
+
+		Show all labels of the pods
+
+			kubectl get po --show-labels
+
+
+		Change the labels of pod 'nginx2' to be app=v2
+
+			kubectl label po nginx2 app=v2 --overwrite
+
+		Get the label 'app' for the pods (show a column with APP labels)
+
+			kubectl get po -L app
+			# or
+			kubectl get po --label-columns=app
+
+
+		Get only the 'app=v2' pods
+
+			kubectl get po -l app=v2
+
+
+		Remove the 'app' label from the pods we created before
+
+			kubectl label po nginx1 nginx2 nginx3 app-
+			# or
+			kubectl label po nginx{1..3} app-
+
+		Return the deployment to the second revision (number 2) and verify the image is nginx:1.19.8
+
+			kubectl rollout undo deploy nginx --to-revision=2
+			kubectl describe deploy nginx | grep Image:
+			kubectl rollout status deploy nginx # Everything should be OK
+
+
+	Pod Placement
+
+
+	Create a pod that will be deployed to a Node that has the label 'accelerator=nvidia-tesla-p100'
+
+		Add the label to a node:
+
+			kubectl label nodes <your-node-name> accelerator=nvidia-tesla-p100
+			kubectl get nodes --show-labels
+
+	We can use the 'nodeSelector' property on the Pod YAML:
+
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		  name: cuda-test
+		spec:
+		  containers:
+		    - name: cuda-test
+		      image: "k8s.gcr.io/cuda-vector-add:v0.1"
+		  nodeSelector: # add this
+		    accelerator: nvidia-tesla-p100 # the selection label
+
+
+	Create a pod that will be placed on node controlplane. Use nodeSelector and tolerations.
+
+		vi pod.yaml
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		  name: frontend
+		spec:
+		  containers:
+		  - name: nginx
+		    image: nginx
+		  nodeSelector:
+		    kubernetes.io/hostname: controlplane
+		  tolerations:
+		  - key: "node-role.kubernetes.io/control-plane"
+		    operator: "Exists"
+		    effect: "NoSchedule"
+
+		kubectl create -f pod.yaml
+
+
+		NOTE: "kubernetes.io/hostname" can be pulled from "k get node ... -o yaml".
+
+
+
+Services
+
+	To reach a service from within a particular cluster:
+
+		<service name local to its namespace>.<namespace>.svc.cluster.local:<port that service listens on> 
+
+	** NOTE: "k port-forward" TYPE can be pod, deployment, service, and possibly others. **  So, in the following situation:
+
+		(⎈|colima:app)C1-494-AGEN:~ anthony$ kgsvc
+		NAME                TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+		nginx-pod-exposed   ClusterIP      10.43.41.96     <none>        80/TCP                       3d20h
+		nginx-deploy        ClusterIP      10.43.139.78    <none>        80/TCP                       3d1h
+		simpleapp-deploy    ClusterIP      10.43.87.112    <none>        80/TCP                       2d21h
+		traefik             LoadBalancer   10.43.137.252   192.168.5.1   80:32590/TCP,443:30216/TCP   3d8h
+		my-httpd            NodePort       10.43.21.155    <none>        80:31586/TCP                 6s
+
+	Run on a M2-Mac-local colima cluster, it wasn't clear, initially, how my-httpd could be hit from outside of the cluster.
+
+		(⎈|colima:app)C1-494-AGEN:~ anthony$ k port-forward service/my-httpd  31586:80
+		Forwarding from 127.0.0.1:31586 -> 80
+		Forwarding from [::1]:31586 -> 80
+		Handling connection for 31586
+		Handling connection for 31586
+
+	and I was able to hit the my-httpd web server, with "http://127.0.0.1:31586", in a web browser, on my Mac.  That "Forwarding from 127.0.0.1:31586" makes clear that this is the local machine and port 80, on the services is what's being forwarded to.
+
+
+Contexts (don't forget "k config -h...")
+
+	k config get-contexts  					# view contexts available from current ($HOME/.kube/config) configuration.
+
+	k config use-context NAME  				# Set/reset context.  This may not get you to the namespace you want, though...
+											# to switch from the last NS used:
+
+	k config set-context --current --namespace=NS_NAME 
+
+
+
+
+
+
+
+Canary Deployment
+
+
+Example description:
+
+Implement canary deployment (of a simple, nginx-based webpage displaying version info) by running two instances of nginx marked as version=v1 and version=v2 so that the load is balanced at 75%-25% ratio
+
+
+
+Deploy 3 replicas of v1:
+
+	apiVersion: apps/v1
+	kind: Deployment
+	metadata:
+	  name: my-app-v1
+	  labels:
+	    app: my-app
+	spec:
+	  replicas: 3
+	  selector:
+	    matchLabels:
+	      app: my-app
+	      version: v1
+	  template:
+	    metadata:
+	      labels:
+	        app: my-app
+	        version: v1
+	    spec:
+	      containers:
+	      - name: nginx
+	        image: nginx
+	        ports:
+	        - containerPort: 80
+	        volumeMounts:
+	        - name: workdir
+	          mountPath: /usr/share/nginx/html
+	      initContainers:
+	      - name: install
+	        image: busybox:1.28
+	        command:
+	        - /bin/sh
+	        - -c
+	        - "echo version-1 > /work-dir/index.html"
+	        volumeMounts:
+	        - name: workdir
+	          mountPath: "/work-dir"
+	      volumes:
+	      - name: workdir
+	        emptyDir: {}
+
+
+Create the service:
+
+	apiVersion: v1
+	kind: Service
+	metadata:
+	  name: my-app-svc
+	  labels:
+	    app: my-app
+	spec:
+	  type: ClusterIP
+	  ports:
+	  - name: http
+	    port: 80
+	    targetPort: 80
+	  selector:
+	    app: my-app
+
+
+
+Test if the deployment was successful from within a Pod:
+
+	# run a wget to the Service my-app-svc
+	kubectl run -it --rm --restart=Never busybox --image=gcr.io/google-containers/busybox --command -- wget -qO- my-app-svc
+
+	version-1
+
+
+Deploy 1 replica of v2:
+
+	apiVersion: apps/v1
+	kind: Deployment
+	metadata:
+	  name: my-app-v2
+	  labels:
+	    app: my-app
+	spec:
+	  replicas: 1
+	  selector:
+	    matchLabels:
+	      app: my-app
+	      version: v2
+	  template:
+	    metadata:
+	      labels:
+	        app: my-app
+	        version: v2
+	    spec:
+	      containers:
+	      - name: nginx
+	        image: nginx
+	        ports:
+	        - containerPort: 80
+	        volumeMounts:
+	        - name: workdir
+	          mountPath: /usr/share/nginx/html
+	      initContainers:
+	      - name: install
+	        image: busybox:1.28
+	        command:
+	        - /bin/sh
+	        - -c
+	        - "echo version-2 > /work-dir/index.html"
+	        volumeMounts:
+	        - name: workdir
+	          mountPath: "/work-dir"
+	      volumes:
+	      - name: workdir
+	        emptyDir: {}
+
+
+Observe that calling the ip exposed by the service the requests are load balanced across the two versions:
+
+	# run a busyBox pod that will make a wget call to the service my-app-svc and print out the version of the pod it reached.
+
+	kubectl run -it --rm --restart=Never busybox --image=gcr.io/google-containers/busybox -- /bin/sh -c 'while sleep 1; do wget -qO- my-app-svc; done'
+
+	version-1
+	version-1
+	version-1
+	version-2
+	version-2
+	version-1
+
+
+If the v2 is stable, scale it up to 4 replicas and shoutdown the v1:
+
+	kubectl scale --replicas=4 deploy my-app-v2
+	kubectl delete deploy my-app-v1
+	while sleep 0.1; do curl $(kubectl get svc my-app-svc -o jsonpath="{.spec.clusterIP}"); done
+	version-2
+	version-2
+	version-2
+	version-2
+	version-2
+	version-2
+
+
+
+
+Quick reference:
+
+
+# To run a command, as port of creating a pod (in this case the command is an infinite loop, which shows what you need to keep a pod up, independent of any other task that might keep it running):
+
+
+	k run troubleshooting-pod --image=busybox -- /bin/sh -c "while true; do sleep 10; done"
+
+
+# To get a temp pod going in your cluster
+k run temp-pod --image=centos:latest -it --tty --rm --restart=Never --command -- /bin/bash
+
+	# To get to where you can run "yum update -y"
+	# sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+	# sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+	# then, you can install wget, netcat, etc.
+
+
+k create namespace mynamespace
+
+
+	k run nginx --image=nginx --restart=Never -n mynamespace
+
+
+	k describe po nginx -o yaml > nginx-pod.yaml
+
+	k run nginx --image=nginx --restart=Never -n mynamespace --dry-run=client -o yaml | k apply -f -
+
+
+
+k create deployment nginx --image=nginx:1.18.0 --replicas=2 --port=80 --dry-run=client -o yaml > nginx-deploy.yaml
+
+
+	k rollout status deploy nginx-deploy
+
+	k rollout history deploy nginx-deploy 
+
+		k rollout history deploy nginx-deploy --revision=2
+
+	k rollout undo deploy nginx-deploy --to-revision=2   ## not so easy to glean from help. who'd 'undo' is the subcom?
+
+	k scale deploy nginx-deploy --replicas=5
+
+	k autoscale deploy nginx-deploy --min=5 --max=10 --cpu-percent=80		## Creates a horizontalpodautoscalers resource 
+
+
+NOTE: jobs versus cronjobs... A Kubernetes Job is a resource that defines a task and ensures that it runs to completion. It creates one or more pods and manages their lifecycle to ensure that the desired number of successful completions is achieved. A CronJob resource creates Job objects on a predefined schedule (daily, weekly, or monthly)
+
+
+
+Create a job named pi with image perl:5.34 that runs the command with arguments "perl -Mbignum=bpi -wle 'print bpi(2000)'"
+
+
+	kubectl create job pi  --image=perl:5.34 -- perl -Mbignum=bpi -wle 'print bpi(2000)'
+
+
+	Wait till it's done, get the output... here, it's important to know that the job creates a pod, which runs the job's command(s).  We know that getting output from a pod is simply a matter of "k log"-ing the pod.
+
+		kubectl get jobs -w # wait till 'SUCCESSFUL' is 1 (will take some time, perl image might be big)
+		kubectl get po # get the pod name
+		kubectl logs pi-**** # get the pi numbers
+		kubectl delete job pi
+
+
+Create a job with the image busybox that executes the command 'echo hello;sleep 30;echo world'
+
+	This didn't work, entirely:
+
+		k create job hello-sleep-echo --image=busybox -- echo hello;sleep 30;echo world
+
+			Output:
+
+				job.batch/hello-sleep-echo created
+				world
+
+				$ k logs $(k get po | grep hello | tr -s ' ' | cut -d ' ' -f1)
+				hello
+
+
+	But, this did:
+
+		k create job busybox --image=busybox -- /bin/sh -c 'echo hello;sleep 30;echo world'
+
+			Output: 
+
+				hello
+				world
+
+
+		Follow the logs for the pod (you'll wait for 30 seconds)
+
+			kubectl get po # find the job pod
+			kubectl logs busybox-ptx58 -f # follow the logs
+
+Create a job but ensure that it will be automatically terminated by kubernetes if it takes more than 30 seconds to execute.
+
+	NOTE: I had no idea how to do this one, since I saw nothing like a timeout feature, in the CLI help page. Searching kubernetes.io/docs, though, for "job timeout" and searching the "Jobs" doc page for "timeout", I found:
+
+		apiVersion: batch/v1
+		kind: Job
+		metadata:
+		  name: pi-with-timeout
+		spec:
+		  backoffLimit: 5
+		  activeDeadlineSeconds: 100
+		  template:
+		    spec:
+		      containers:
+		      - name: pi
+		        image: perl:5.34.0
+		        command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+		      restartPolicy: Never
+
+	This made clear that the spec.activeDeadlineSeconds var needed to be employed.
+
+
+	kubectl create job busybox --image=busybox --dry-run=client -o yaml -- /bin/sh -c 'while true; do echo hello; sleep 10;done' > job.yaml
+
+	vi job.yaml
+	Add job.spec.activeDeadlineSeconds=30
+
+		apiVersion: batch/v1
+		kind: Job
+		metadata:
+		  creationTimestamp: null
+		  labels:
+		    run: busybox
+		  name: busybox
+		spec:
+		  activeDeadlineSeconds: 30 # add this line
+		  template:
+		    metadata:
+		      creationTimestamp: null
+		      labels:
+		        run: busybox
+		    spec:
+		      containers:
+		      - args:
+		        - /bin/sh
+		        - -c
+		        - while true; do echo hello; sleep 10;done
+		        image: busybox
+		        name: busybox
+		        resources: {}
+		      restartPolicy: OnFailure
+		status: {}
+
+
+
+Create the same cron job again, and watch the status. Once it ran, check which job ran by the created cron job. Check the log, and delete the cron job
+
+	kubectl get cj
+	kubectl get jobs --watch
+	kubectl get po --show-labels # observe that the pods have a label that mentions their 'parent' job
+	kubectl logs busybox-1529745840-m867r
+	# Bear in mind that Kubernetes will run a new job/pod for each new cron job
+	kubectl delete cj busybox
+
+
+Create a cron job with image busybox that runs every minute and writes 'date; echo Hello from the Kubernetes cluster' to standard output. The cron job should be terminated if it takes more than 17 seconds to start execution after its scheduled time (i.e. the job missed its scheduled time).
+
+	.spec.startingDeadlineSeconds is the thing to use for that "if it takes more than 17 seconds" bit.
+
+
+
+Create a cron job with image busybox that runs every minute and writes 'date; echo Hello from the Kubernetes cluster' to standard output. The cron job should be terminated if it takes more than 17 seconds to start execution after its scheduled time (i.e. the job missed its scheduled time).
+
+	.spec.startingDeadlineSeconds from the Jobs resource (this option doesn't appear in the cronjobs kubernets.io doc or in the "-h" for "k create cronjob") is the thing to use for that "terminated if it successfully starts but takes more than 12 seconds to complete execution."
+
+
+Observability
+
+	# Lots of pods are running in qa,alan,test,production namespaces. All of these pods are configured with liveness probe. Please list all pods whose liveness probe are failed (key: "liveness probe fail") in the format of <namespace>/<pod name> per line.
+
+		A typical liveness probe failure event:
+
+			LAST SEEN   TYPE      REASON      OBJECT              MESSAGE
+	22m         Warning   Unhealthy   pod/liveness-exec   Liveness probe failed: cat: can't open '/tmp/healthy': No such file or directory
+
+
+		collect failed pods namespace by namespace
+
+		kubectl get events -o json | jq -r '.items[] | select(.message | contains("failed liveness probe")).involvedObject | .namespace + "/" + .name'
+
+
+
+	# Get CPU/memory utilization for nodes (metrics-server must be running)
+
+		kubectl top nodes
+
+
+	# Create an nginx pod with a liveness probe that just runs the command 'ls'. Save its YAML in pod.yaml. Run it, check its probe status, delete it.
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  creationTimestamp: null
+	  labels:
+	    run: nginx-liveness-probe-pod
+	  name: nginx-liveness-probe-pod
+	spec:
+	  containers:
+	  - image: nginx
+	    name: nginx-liveness-probe
+	    resources: {}
+	    livenessProbe:
+	      exec:
+	        command:
+	        - ls
+	      initialDelaySeconds: 5
+	      periodSeconds: 5
+	  dnsPolicy: ClusterFirst
+	  restartPolicy: Never
+	status: {}
+
+
+	# Create an nginx pod (that includes port 80) with an HTTP readinessProbe on path '/' on port 80. Again, run it, check the readinessProbe, delete it.
+
+		## NOTE: default "initialDelaySeconds: 1" causes readiness check to fail, eventhough kubelet's http check returns 200(OK). "initialDelaySeconds: 15" seems to be better.
+
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  creationTimestamp: null
+	  labels:
+	    run: nginx-rediness-pod
+	  name: nginx-readiness-pod
+	spec:
+	  containers:
+	  - image: nginx
+	    name: nginx-readiness
+	    ports:
+	    - containerPort: 80
+	    readinessProbe:
+	      httpGet:
+	        path: /
+	        port: 80
+	      initialDelaySeconds: 15
+	      periodSeconds: 10
+	  restartPolicy: Never
+	  dnsPolicy: ClusterFirst
+
+
+	status: {}
+
+
+Patching Resources
+
+	# Partially update a node
+	kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
+
+	# Update a container's image; spec.containers[*].name is required because it's a merge key
+	kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
+
+	# Update a container's image using a json patch with positional arrays
+	kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
+
+	# Disable a deployment livenessProbe using a json patch with positional arrays
+	kubectl patch deployment valid-deployment  --type json   -p='[{"op": "remove", "path": "/spec/template/spec/containers/0/livenessProbe"}]'
+
+	# Add a new element to a positional array
+	kubectl patch sa default --type='json' -p='[{"op": "add", "path": "/secrets/1", "value": {"name": "whatever" } }]'
+
+	# Update a deployment's replica count by patching its scale subresource
+	kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'
+
+
+Services, Networking
+
+	Create a pod with image nginx called nginx and expose its port 80
+
+	kubectl run nginx --image=nginx --restart=Never --port=80 --expose
+	# observe that a pod as well as a service are created
+
+
+	Get service's ClusterIP, create a temp busybox pod and 'hit' that IP with wget
+
+		kubectl get svc nginx # get the IP (something like 10.108.93.130)
+		kubectl run busybox --rm --image=busybox -it --restart=Never --
+		wget -O- [PUT THE POD'S IP ADDRESS HERE]:80
+		exit
+
+
+	Confirm that ClusterIP has been created. Also check endpoints
+
+		kubectl get svc nginx # services
+		kubectl get ep # endpoints
+
+
+	Create a service (separate from deploy or pod... if "--expose" not used in "k run..." call) that exposes deployment on port 6262. Verify its existence, check the endpoints
+
+		## NOTE: if you don't specify "--target-port...", it's assumed that your target endpoints listen on the same port that you're exposing.  
+
+		kubectl expose deploy foo --port=6262 --target-port=8080
+		kubectl get service foo # you will see ClusterIP as well as port 6262
+		kubectl get endpoints foo # you will see the IPs of the three replica pods, listening on port 8080
+
+
+	Create an nginx deployment of 2 replicas, expose it via a ClusterIP service on port 80. Create a NetworkPolicy so that only pods with labels 'access: granted' can access the deployment and apply it
+	kubernetes.io > Documentation > Concepts > Services, Load Balancing, and Networking > Network Policies
+
+	Note that network policies may not be enforced by default, depending on your k8s implementation. E.g. Azure AKS by default won't have policy enforcement, the cluster must be created with an explicit support for netpol https://docs.microsoft.com/en-us/azure/aks/use-network-policies#overview-of-network-policy
+
+
+		kubectl create deployment nginx --image=nginx --replicas=2
+		kubectl expose deployment nginx --port=80
+
+		kubectl describe svc nginx # see the 'app=nginx' selector for the pods
+		# or
+		kubectl get svc nginx -o yaml
+
+			vi policy.yaml
+			kind: NetworkPolicy
+			apiVersion: networking.k8s.io/v1
+			metadata:
+			  name: access-nginx # pick a name
+			spec:
+			  podSelector:
+			    matchLabels:
+			      app: nginx # selector for the pods
+			  ingress: # allow ingress traffic
+			  - from:
+			    - podSelector: # from pods
+			        matchLabels: # with this label
+			          access: granted
+
+
+State Persistence
+
+	Create busybox pod with two containers, each one will have the image busybox and will run the 'sleep 3600' command. Make both containers mount an emptyDir at '/etc/foo'. Connect to the second busybox, write the first column of '/etc/passwd' file to '/etc/foo/passwd'. Connect to the first busybox and write '/etc/foo/passwd' file to standard output. Delete pod.
+
+		k run busybox-two-container-pod --image=busybox --restart=Never --dry-run=client -o yaml -- sleep 3600 > busybox-two-container-pod.yaml
+
+		## Then edit the resulting yaml, copy/pasting the container block and renaming both containers.  Search kubernetes.io/docs for "mount volume to pod", to pull the syntax for emptydir volumes and mounts.  Create one of the former and mount to both containers.
+
+	Create a busybox pod with 'sleep 3600' as arguments. Copy '/etc/passwd' from the pod to your local folder
+
+		kubectl run busybox --image=busybox --restart=Never -- sleep 3600
+		kubectl cp busybox:/etc/passwd ./passwd # kubectl cp command
+		# previous command might report an error, feel free to ignore it since copy command works
+		cat passwd
+
+
+
+
+Helm
+
+	Creating a basic Helm chart
+
+		(⎈|colima:app)C1-494-AGEN:exercises anthony$ helm create chart-test ## this would create a helm 
+
+		(⎈|colima:app)C1-494-AGEN:exercises anthony$ tree chart-test/
+		chart-test/
+		├── Chart.yaml
+		├── charts
+		├── templates
+		│   ├── NOTES.txt
+		│   ├── _helpers.tpl
+		│   ├── deployment.yaml
+		│   ├── hpa.yaml
+		│   ├── ingress.yaml
+		│   ├── service.yaml
+		│   ├── serviceaccount.yaml
+		│   └── tests
+		│       └── test-connection.yaml
+		└── values.yaml
+
+		4 directories, 10 files
+		...
+
+		(⎈|colima:app)C1-494-AGEN:chart-test anthony$ ack Values.image
+		templates/deployment.yaml
+		26:      {{- with .Values.imagePullSecrets }}
+		37:          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+		38:          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+
+	Running a Helm chart
+
+		helm install -f myvalues.yaml myredis ./redis
+
+
+	Find pending Helm deployments on all namespaces
+
+		helm list --pending -A
+
+	Uninstall a Helm release
+
+		helm uninstall -n namespace release_name
+
+	Using Helm repo
+
+		Add, list, remove, update and index chart repos
+
+			helm repo add [NAME] [URL]  [flags]
+
+			helm repo list | helm repo ls
+
+			helm repo remove [REPO1] [flags]
+
+			helm repo update | helm repo up
+
+			helm repo update [REPO1] [flags]
+
+			helm repo index [DIR] [flags]
+
+
+	Download a Helm chart from a repository
+
+		helm pull [chart URL | repo/chartname] [...] [flags] ## this would download a helm, not install 
+		helm pull --untar [rep/chartname] # untar the chart after downloading it 
+
+		## Example:
+
+			helm pull hackcoderr-httpd/httpd --version 0.1.0 --untar
+
+
+	Write the contents of the values.yaml file of the bitnami/node chart to standard output
+
+		helm show values bitnami/node
+
+
+	Add the Bitnami repo at https://charts.bitnami.com/bitnami to Helm
+
+		helm repo add bitnami https://charts.bitnami.com/bitnami
+
+	Upgrading a Helm chart
+
+		helm upgrade -f myvalues.yaml -f override.yaml redis ./redis
+
+
+		helm upgrade [RELEASE] [CHART] [flags]
+
+	Install the bitnami/node chart setting the number of replicas to 5
+
+		*** NOTE: the mongo pod won't start, on M? Macs. So, the other pods stall in "Init:CrashLoopBackOff" ***
+			See https://github.com/bitnami/charts/issues/7305
+
+		To fulfill the basic request, though, we need two key pieces of information:
+
+		The name of the attribute in values.yaml which controls replica count
+		A simple way to set the value of this attribute during installation
+		To identify the name of the attribute in the values.yaml file, we could get all the values, as in the previous task, and then grep to find attributes matching the pattern replica
+
+			helm show values bitnami/node | grep -i replica
+			which returns:
+				## @param replicaCount Specify the number of replicas for the application
+				replicaCount: 1
+
+		We can use the --set argument during installation to override attribute values. Hence, to set the replica count to 5, we need to run
+
+			helm install mynode bitnami/node --set replicaCount=5
+
+
+Custom Resource Definitions
+
+	It's likely going to be best to search the k8s docs for "customresourcedefinition" and go with the first hit that appears (It should have a title of "Extend the Kubernetes API..."):
+
+		https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/
+
+	This page contains info on CRDs, 
+
+Nice things to install into nginx (Ubuntu) image
+
+	procps # for ps
+
+	bash is already installed

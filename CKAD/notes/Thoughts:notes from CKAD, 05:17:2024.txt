@@ -1,0 +1,59 @@
+Thoughts/notes from CKAD, 05/17/2024
+
+
+1.)  Weighting. 
+
+I had no sense, at all, of the questions' being weighted differently... with some having great value and others having far less.  I need to be mindful of this, in the re-take: maybe, running thru, flagging the light ones and trying to solve the heavier ones, on a first pass.  Then, coming back to the lighter ones, in subsequent passes.
+
+If I'd had time to make a second or third pass-thru, I wouldn't have known how to jump back to particular questions or how to, simply, run thru my flagged items.
+
+
+2.)  The testing environment.
+
+Is there any way to work in a version of the VM: just for the purposes of getting to know it?  It seemed that it was a Linux GUI of some kind, but I had no idea how to bring up a Notepad app and/or Calculator: both of which would have helped, a great deal.  
+
+Copy/paste seemed to be really problematic.  Highlighting and right-click-copying, then pasting didn't seem to work well.
+
+I believe it really would have helped to have worked on a large monitor.  Also, a button-based external mouse would probably have been better than my laptop's track-pad.
+
+This note may prove very helpful:
+
+https://kavinduchamiran.medium.com/my-two-cents-on-passing-ckad-in-2022-ffbb7f1c65be
+
+In the "Mac users: bind ..." (Mac-cmd versus ctrl key) section, though, where the guy recommends switching the cmd and ctrl keys, you need to navigate to System_Settings=>Keyboard=>Keyboard_Shortcuts=>Modifier_Keys.  This should be done, right before the exam, then undone (restore defaults), right after completing the exam.
+
+
+
+3.)  Over-dependence on Docs and CLI-help.
+
+This really hurt me, especially when combined with things like issues with right-click-copy/pasting.  The ~/.vimrc file had a lot of good settings.  I need to commit to memory details for writing 
+
+	* Env vars
+
+	* readinessProbes, livenessProbes,
+
+	* volumes and volume mounts
+
+	* Other resources... possible Google Search: which Kubernetes resources appear with greatest frequency, in the CKAD exam?  For a number of things, CLI-based help, combined with  "--dry-run=client -o yaml" can get you a good deal of the way, but things like those, mentioned above, there is no CLI help.
+
+
+4.)  Speed
+
+The only question that came out of left field and I had no idea how to complete/answer was the one related to using Dockerfile to add an image or something along those lines.  Essentially, a Docker question.  With everything else, I had at least a pretty good sense of what was required.  It just took me way too long to execute, given issues sighted, above, and, I believe, the fact that I'd not done enough drilling, in the months before the test.  I need to get my facility, comfort, and execution speed way up, on...
+
+	* Creating deployments (including canary and blue/green ones)
+
+	* Exposing deployments and/or other resources
+
+	* Making small changes to existing resources, via
+		* kubectl-editing OR 
+		* modifying+kaf'ing the relevant manifests OR 
+		* k-o-yaml'ing-to-manifest+modifying existing resources (AHEAD OF DELETING THEM!!!), deleting, and kaf'ing the resulting updated manifests.
+
+It might also be good to stop using kubectx and kubens, day-to-day... using, instead:
+
+	k config use-context XXXX 				# to switch cluster+context
+	
+	k config set-context --current --namespace=YYYY		# to set namespace
+
+In the exam space, it seems that contexts are already setup such that switching to the one your instructed to work in lands you on the correct cluster.  I just had a bit of trouble with namespace-targeting... There was too much of a need for me to use "--namespace " or "-n "

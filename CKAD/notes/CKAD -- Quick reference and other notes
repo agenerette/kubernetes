@@ -34,12 +34,97 @@ Other notes:
 
 Aliases (memorize these and put them in place, before each lab, at the start of the exam)
 
-	alias ka="kubectl apply -f"
+	alias kaf="kubectl apply -f"
+	alias krm="kubectl delete"
+	
 	alias kns="kubectl config set-context --current --namespace"
 	alias kd="kubectl describe"
 	alias ke="kubectl explain --recursive"
 	export do="--dry-run=client -o yaml"
 	export now="--grace-period 0 --force"
+
+
+
+
+
+A few indentation and "array" notes:
+
+    1 apiVersion: v1
+    2 kind: Pod
+    3 metadata:
+    4   creationTimestamp: null
+    5   labels:
+    6     run: pod1
+    7   name: pod1
+    8 spec:
+    9   volumes:
+    10   - name: configmapvol
+    11     configMap:
+    12       name: birke
+    13 
+    14   containers:
+    15   - image: nginx:alpine
+    16     name: pod1
+    17     volumeMounts:
+    18     - name: configmapvol
+    19       mountPath: /etc/birke/
+    20     env:
+    21     - name: TREE1
+    22       valueFrom:
+    23         configMapKeyRef:
+    24           name: trauerweide
+    25           key: tree
+    26     resources: {}
+    27   dnsPolicy: ClusterFirst
+    28   restartPolicy: Never
+    29 status: {}
+
+
+
+The following is an array:
+
+    10   - name: configmapvol
+    11     configMap:
+    12       name: birke
+
+It needs to be that, because "volumes:" allows for multiple resources of that type, of course.  The same is true for "volumeMounts:".  The "name" field of, for instance, the "configMap" and "configMapKeyRef" blocks do not have  "-" before them, because these are not part of arrays: there's only one set of name&key values for the latter and only one "name" for the former.
+
+
+Where indentation is concerned, I had thought that the following was required:
+
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: pod1
+      name: pod1
+    spec:
+      volumes:
+        - name: configmapvol
+          configMap:
+            name: birke
+
+      containers:
+        - image: nginx:alpine
+          name: pod1
+          volumeMounts:
+            - name: configmapvol
+              mountPath: /etc/birke/
+          env:
+            - name: TREE1
+              valueFrom:
+                configMapKeyRef:
+                  name: trauerweide
+                  key: tree
+          resources: {}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
+    status: {}
+
+
+So, each of the arrays (the one for volumes, containers, and env var), I thought, needed to be indented.  The version of that manifest shown at the top of this document, though, shows that the indentation is not required: I was able to kaf both files, to generate the pod.
+
 
 
 
